@@ -1,0 +1,6 @@
+#define ONE_WIRE_BUS_PIN 0
+
+#define SONAR_TRIGGER_PIN 2
+#define SONAR_ECHO_PIN 15
+
+#define RELAY_PIN  4

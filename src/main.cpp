@@ -32,7 +32,9 @@ Sonar_Sensor sonar(SONAR_TRIGGER_PIN, SONAR_ECHO_PIN,  UPDATE_DELAY, 0, 0, false
 
 OneWire oneWire(ONE_WIRE_BUS_PIN);
 DallasTemperature sensors(&oneWire);
-DeviceAddress sensor1 = { 0x28, 0xFF, 0x77, 0x62, 0x40, 0x17, 0x4, 0x31 };
+DeviceAddress sensor1 = { 0x28, 0x3F, 0x0B, 0x77, 0x91, 0x06, 0x02, 0x1C };
+
+
 
 #include "tcs34725_sensor.h"
 TCS34725_Sensor tcs34725(UPDATE_DELAY, 0, 0, false);;
@@ -190,8 +192,9 @@ const char* reboot_reason(int code) {
   }
 }
   
+char hostname[sizeof(WATERBALL_HOSTNAME) + 9];
+
 void setup() {
-  char hostname[sizeof(WATERBALL_HOSTNAME) + 8];
   byte mac_address[6];
 
   delay(500);
@@ -216,7 +219,7 @@ void setup() {
   wifiMulti.addAP(WIFI_SSID3, WIFI_PASSWORD3);
 
   WiFi.macAddress(mac_address);
-  snprintf(hostname, sizeof(hostname), "%s %02x%02x%02x", WATERBALL_HOSTNAME, (int)mac_address[3], (int)mac_address[4], (int)mac_address[5]);
+  snprintf(hostname, sizeof(hostname), "%s-%02x%02x%02x", WATERBALL_HOSTNAME, (int)mac_address[3], (int)mac_address[4], (int)mac_address[5]);
   Serial.printf("Hostname is %s\n", hostname);
 
   WiFi.setHostname(hostname);
@@ -226,20 +229,29 @@ void setup() {
     Serial.print(".");
     delay(100);
   }
-
   Serial.println("[wifi]");
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.setTextSize(2);
+  display.print(WiFi.localIP());
+  display.display();
 
   ifttt.trigger("reboot", reboot_reason(rtc_get_reset_reason(0)),  reboot_reason(rtc_get_reset_reason(1)));
   Serial.println("[IFTTT]");
 
   if(!MDNS.begin(hostname))
     Serial.println("Error setting up MDNS responder!");
-  else
-    Serial.println("mDNS responder started");
+
   Serial.println("[mDNS]");
 
-  mqtt_connect();
+  mqtt_client.connect(hostname, MQTT_USERNAME, MQTT_PASSWORD);
+  mqtt_client.publish("/foo", "bar");
+  mqtt_client.publish("/foo", "frotz", true);
   Serial.println("[MQTT]");
+
+  mqtt_connect();
+  Serial.println("[AIO]");
 
   configTime(TZ_OFFSET, DST_OFFSET, "pool.ntp.org", "time.nist.gov");
   Serial.println("[NTP]");
@@ -276,12 +288,6 @@ void setup() {
   ArduinoOTA.begin();
   Serial.println("[ota]");
 
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(hostname);
-  display.println(WiFi.localIP());
-  display.display();
-
   bme280.begin();
   Serial.println("[bme280]");
 
@@ -289,12 +295,10 @@ void setup() {
   Serial.println("[tcs34725]");
 
   sonar.begin();
-  Serial.println("[sonar]]");
+  Serial.println("[sonar]");
 
   sensors.begin();
   Serial.println("[dallas]");
-
-  mqtt_connect();
 
   delay(500);
 }
@@ -305,6 +309,13 @@ void loop() {
       mqtt_connect();
   }
 
+  if(!mqtt_client.connected())
+    mqtt_client.connect(hostname, MQTT_USERNAME, MQTT_PASSWORD);
+
+  mqtt_client.loop();
+
+  ArduinoOTA.handle();
+
   static unsigned long last_loop = 0;
 
   if(millis() - last_loop < UPDATE_DELAY)
@@ -312,19 +323,26 @@ void loop() {
 
   Serial.println("next: handles");
 
-  ArduinoOTA.handle();
-
   bme280.handle();
   tcs34725.handle();
   sonar.handle();
-
-  Serial.println("next: sonar");
 
   unsigned distance = 0;
   uint16_t red = 0, green = 0, blue = 0;
   int temperature = 0, humidity = 0, pressure = 0;
   int lux = 0;
+  int16_t water_temp = 0;
 
+  unsigned long last_water_temp = 0;
+
+  Serial.println("next: dallas");
+  if(millis() - last_water_temp > UPDATE_DELAY) {
+    water_temp = sensors.getTempC(sensor1);
+    Serial.printf("Dallas %d\n", water_temp);
+    last_water_temp = millis() + UPDATE_DELAY;
+  }
+
+  Serial.println("next: sonar");
   if(sonar.ready_for_update()) {
     distance = sonar.distance_cm();
     Serial.printf("SONAR distance %u\n", distance);
@@ -388,18 +406,21 @@ void loop() {
   Serial.printf("Free heap %u bytes\n", ESP.getFreeHeap());
 
   char buffer[500];
-  snprintf(buffer, 500, "{\"temperature\": %d, \"humidity\": %d, \"pressure\": %d, \"red\": %d, \"green\": %d, \"blue\": %d, \"lux\": %d, \"distance\": %d, \"freeheap\": %d, \"uptime\": %lu, \"timestamp\": %lu }",
+  snprintf(buffer, 500, "{\"temperature\": %d, \"humidity\": %d, \"pressure\": %d, \"red\": %d, \"green\": %d, \"blue\": %d, \"lux\": %d, \"water_temperature\": %d, \"distance\": %d, \"freeheap\": %d, \"uptime\": %lu, \"timestamp\": %lu }",
 	   temperature, humidity, pressure,
 	   red, green, blue, lux,
+	   water_temp,
 	   distance,
 	   ESP.getFreeHeap(), uptime.uptime()/1000,
 	   time(NULL));
 
     Serial.println(buffer);
 
-    mqtt_client.publish("/aqua", buffer, 1);
+    mqtt_client.publish("/aqua", buffer, true);
 
 #ifdef REST_API_ENDPOINT
+    void post(char*);
+
     post(buffer);
 #endif
 }

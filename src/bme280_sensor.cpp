@@ -8,8 +8,6 @@ void BME280_Sensor::begin() {
     _status = SENSOR_NOT_FOUND;
     return;
   }
-
-  Serial.println("BME OK");
 }
 
 void BME280_Sensor::handle() {

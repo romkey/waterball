@@ -10,9 +10,6 @@ class Dallas_Sensor : public Sensor {
   void handle();
 
   uint16_t temperature() { _mark_read(); return _temperature; };
-  uint16_t humidity() { _mark_read(); return _humidity; };
-  uint16_t pressure() { _mark_read(); return _pressure; };
-  uint16_t altitude() { _mark_read(); return _altitude; };
 
  private:
   OneWire _one_wire;

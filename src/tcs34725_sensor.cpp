@@ -16,6 +16,6 @@ void TCS34725_Sensor::handle() {
   _tcs34725.getRawData(&_red, &_green, &_blue, &_color_temperature);
 
   // colorTemp = _tcs34725.calculateColorTemperature(r, g, b);
-  _color_temperature = _tcs34725.calculateColorTemperature_dn40(_red, _green, _blue, c);
+  //  _color_temperature = _tcs34725.calculateColorTemperature_dn40(_red, _green, _blue, c);
   _lux = _tcs34725.calculateLux(_red, _green, _blue);
 }

@@ -9,6 +9,7 @@ class Sonar_Sensor : public Sensor {
   void begin();
   void handle();
 
+  bool valid() {  return (_distance_cm < 100); };
   uint16_t distance_cm() { _mark_read(); return _distance_cm; };
   uint16_t distance_mm() { _mark_read(); return _distance_mm; };
 

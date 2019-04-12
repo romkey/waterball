@@ -324,6 +324,7 @@ void loop() {
     Serial.printf("Pressure %d\n", pressure);
     Serial.printf("Humidity %d\n", humidity);
 
+
     ph = ph_sensor.ph();
 
     Serial.print("pH ");
@@ -339,13 +340,19 @@ void loop() {
     if(update_adafruit_flag) {
       update_adafruit_flag = false;
 
-      distance_feed.publish(distance);
+      if(sonar.valid())
+	distance_feed.publish(distance);
+
       pressure_feed.publish(pressure);
       humidity_feed.publish(humidity);
-      lux_feed.publish(lux);
-      red_feed.publish(red);
-      green_feed.publish(green);
-      blue_feed.publish(blue);
+
+#define RGB_VALID lux != -1 && lux != 65535 && (time(NULL) - last_rgb_update_time < 5 * 60)
+      if(RGB_VALID) {
+	lux_feed.publish(lux);
+	red_feed.publish(red);
+	green_feed.publish(green);
+	blue_feed.publish(blue);
+      }
 
       uptime_feed.publish((unsigned)uptime.uptime()/1000);
       Serial.printf("Uptime %.2f seconds\n", uptime.uptime() / 1000.0);
@@ -354,16 +361,46 @@ void loop() {
       Serial.printf("Free heap %u bytes\n", ESP.getFreeHeap());
     }
 
+    char buffer[500];
     if(update_rest_flag || update_mqtt_flag) {
-      char buffer[500];
-      snprintf(buffer, 500, "{\"temperature\": %d, \"humidity\": %d, \"pressure\": %d, \"red\": %d, \"green\": %d, \"blue\": %d, \"lux\": %d, \"water_temperature\": %d, \"distance\": %d, \"ph\": %f, \"freeheap\": %d, \"uptime\": %lu, \"timestamp\": %lu }",
-	     temperature, humidity, pressure,
-	     red, green, blue, lux,
-	     water_temp,
-	     distance,
-	     ph,
-	     ESP.getFreeHeap(), uptime.uptime()/1000,
-	     time(NULL));
+      char sm_buffer[100];
+
+      snprintf(buffer, 500, "{\"freeheap\": %d, \"uptime\": %lu, \"timestamp\": %lu, ", ESP.getFreeHeap(), uptime.uptime()/1000, time(NULL));
+
+      snprintf(sm_buffer, 100, "\"temperature\": %d, \"humidity\": %d, \"pressure\": %d, ", temperature, humidity, pressure);
+
+      if(RGB_VALID)
+	snprintf(sm_buffer, 100, "\"red\": %d, \"green\": %d, \"blue\": %d, \"lux\": %d, ", red, green, blue, lux);
+      else
+	snprintf(sm_buffer, 100, "\"red\": null, \"green\": null, \"blue\": null, \"lux\": null, ");
+      strncat(buffer, sm_buffer, 500);
+
+
+
+      if(water_temp > 0 && water_temp < 50)
+	snprintf(sm_buffer, 100, "\"water_temperature\": %d, ", water_temp);
+      else
+	snprintf(sm_buffer, 100, "\"water_temperature\": null, ");
+      strncat(buffer, sm_buffer, 500);
+
+
+
+      if(sonar.valid())
+	snprintf(sm_buffer, 100, "\"distance\": %d, ", distance);
+      else
+	snprintf(sm_buffer, 100, "\"distance\": null, ");
+      strncat(buffer, sm_buffer, 500);
+
+
+
+      if(ph_sensor.valid())
+	snprintf(sm_buffer, 100, "\"ph\": %f ", ph);
+      else
+	snprintf(sm_buffer, 100, "\"ph\": null ");
+      strncat(buffer, sm_buffer, 500);
+
+      strncat(buffer, "}", 500);
+    }
 
     Serial.println(buffer);
 
@@ -380,7 +417,6 @@ void loop() {
       post(buffer);
     }
 #endif
-  }
   }
 
   if(update_heartbeat_flag) {

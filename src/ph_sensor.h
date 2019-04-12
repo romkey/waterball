@@ -11,7 +11,7 @@ class PH_Sensor : public Sensor {
   void begin();
   void handle();
 
-  bool ph_valid() { return _ph > 0 && _ph < 14; };
+  bool valid() { return _ph > 0 && _ph < 14; };
   float ph() { _mark_read(); return _ph; };
 
  private:

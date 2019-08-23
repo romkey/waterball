@@ -1,31 +1,26 @@
 #include <Arduino.h>
 
 #ifdef ESP8266
-#include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #else
-#include <Esp.h>
-#include <WiFi.h>
 #include <ESPmDNS.h>
 #endif
 
-#include <SPI.h>
-#include <Wire.h>
 #include <SPIFFS.h>
 
 #include "config.h"
 #include "hw.h"
 
-#include "wifi_local.h"
-#include "ota_updates.h"
-#include "mqtt.h"
+#include "multiball/wifi.h"
+#include "multiball/ota_updates.h"
+#include "multiball/mqtt.h"
+#include "multiball/indicator.h"
+
 #include "homebus_mqtt.h"
-#include "indicator.h"
 
 #include "sensors/bme280.h"
 #include "sensors/dallas.h"
 #include "sensors/tofl.h"
-
 
 #ifdef BUILD_INFO
 
@@ -48,6 +43,11 @@ RTC_DATA_ATTR int bootCount = 0;
 
 void setup() {
   const char* hostname = "";
+  const char *wifi_credentials[] = {
+    WIFI_SSID1, WIFI_PASSWORD1,
+    WIFI_SSID2, WIFI_PASSWORD2,
+    WIFI_SSID3, WIFI_PASSWORD3
+  };
 
   bootCount++;
 
@@ -62,10 +62,10 @@ void setup() {
   else
     Serial.println("[spiffs]");
 
-  indicator_setup();
+  indicator_setup(1);
   Serial.println("[indicator]");
 
-  if(wifi_setup()) {
+  if(wifi_begin(wifi_credentials, 3)) {
     Serial.println(WiFi.localIP());
     Serial.println("[wifi]");
 
@@ -83,7 +83,7 @@ void setup() {
   ota_updates_setup();
   Serial.println("[ota_updates]");
 
-  mqtt_setup();
+  mqtt_setup(MQTT_HOST, MQTT_PORT, MQTT_UUID, MQTT_USER, MQTT_PASS);
   Serial.println("[mqtt]");
 
   homebus_mqtt_setup();
@@ -104,18 +104,17 @@ void setup() {
   ph_sensor.begin();
   Serial.println("[ph]");
 #endif
-
 }
 
 bool status_changed = true;
 
 void loop() {
-  ota_updates_loop();
+  ota_updates_handle();
 
   bme280_loop();
   tofl_loop();
   dallas_loop();
 
-  mqtt_loop();
+  mqtt_handle();
   homebus_mqtt_loop();
 }

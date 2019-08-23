@@ -1,23 +1,15 @@
-#ifdef ESP8266
-#include <ESP8266WiFi.h>
-#else
-#include <Esp.h>
-#include <WiFi.h>
-#endif
-
 #include "config.h"
 #include "hw.h"
 
-#include "wifi_local.h"
-#include "mqtt.h"
+#include "multiball/wifi.h"
+#include "multiball/mqtt.h"
 #include "homebus_mqtt.h"
 
-#include "uptime.h"
+#include "multiball/uptime.h"
 
 #include "sensors/bme280.h"
 #include "sensors/dallas.h"
 #include "sensors/tofl.h"
-
 
 static Uptime uptime;
 
@@ -92,4 +84,12 @@ static void homebus_mqtt_publish_status() {
 
   Serial.println(buf);
   mqtt_publish(homebus_endpoint.c_str(), buf, true);
+}
+
+// standard homebus vocabulary:
+// - ping
+// - restart
+// waterball homebus vocabulary:
+// - scan_dallas
+void homebus_mqtt_callback(char const* topic, char const* msg) {
 }

@@ -14,16 +14,14 @@
 
 WiFiMulti wifiMulti;
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
-Adafruit_SSD1306 display;
-
 #include "bme280_sensor.h"
 BME280_Sensor bme280(MQTT_UPDATE_FREQUENCY, 0, 0, false);
 
+#if USE_SONAR
 #include "sonar_sensor.h"
 Sonar_Sensor sonar(SONAR_TRIGGER_PIN, SONAR_ECHO_PIN,  MQTT_UPDATE_FREQUENCY, 0, 0, false);
+#endif
+
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -32,10 +30,18 @@ DallasTemperature sensors(&oneWire);
 // DeviceAddress sensor1 = { 0x28, 0x3F, 0x0B, 0x77, 0x91, 0x06, 0x02, 0x1C };
 // DeviceAddress sensor1 = { 0x28, 0x4B, 0x8, 0x46, 0x92, 0x09, 0x02, 0x2D };
 // DeviceAddress sensor1 = { 0x28, 0x3F, 0xB, 0x77, 0x91, 0x6, 0x2, 0x0 };
-DeviceAddress sensor1 = { 0x28, 0xE6, 0xB9, 0x46, 0x92, 0x10, 0x2, 0xE7 };
+// DeviceAddress sensor1 = { 0x28, 0xE6, 0xB9, 0x46, 0x92, 0x10, 0x2, 0xE7 };
+DeviceAddress sensor1 = { 0x28, 0x28, 0xC8, 0x4D, 0x97, 0x13, 0x03, 0x6A };
 
+#ifdef USE_PH
 #include "ph_sensor.h"
 PH_Sensor ph_sensor(PH_ADC_INPUT, MQTT_UPDATE_FREQUENCY, 0, 0, false);
+#endif
+
+#ifdef USE_TOFL
+#include "tofl_sensor.h"
+TOFL_Sensor tol_sensor(MQTT_UPDATE_FREQUENCY, 0, 0, false);
+#endif
 
 #include "uptime.h"
 Uptime uptime;
@@ -60,78 +66,6 @@ void wifi_blink();
 
 static PubSubClient mqtt_client(MQTT_SERVER, MQTT_PORT, mqtt_callback, wifi_mqtt_client);
 
-
-#include <Adafruit_MQTT.h>
-#include <Adafruit_MQTT_Client.h>
-static WiFiClient wifi_aio_client;
-Adafruit_MQTT_Client mqtt(&wifi_aio_client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
-
-Adafruit_MQTT_Publish temperature_feed(&mqtt, AIO_USERNAME "/feeds/waterball.temperature");
-Adafruit_MQTT_Publish humidity_feed(&mqtt, AIO_USERNAME "/feeds/waterball.humidity");
-Adafruit_MQTT_Publish pressure_feed(&mqtt, AIO_USERNAME "/feeds/waterball.pressure");
-
-Adafruit_MQTT_Publish distance_feed(&mqtt, AIO_USERNAME "/feeds/waterball.distance");
-
-Adafruit_MQTT_Publish red_feed(&mqtt, AIO_USERNAME "/feeds/waterball.red");
-Adafruit_MQTT_Publish green_feed(&mqtt, AIO_USERNAME "/feeds/waterball.green");
-Adafruit_MQTT_Publish blue_feed(&mqtt, AIO_USERNAME "/feeds/waterball.blue");
-Adafruit_MQTT_Publish lux_feed(&mqtt, AIO_USERNAME "/feeds/waterball.lux");
-
-Adafruit_MQTT_Publish uptime_feed(&mqtt, AIO_USERNAME "/feeds/waterball.uptime");
-Adafruit_MQTT_Publish freeheap_feed(&mqtt, AIO_USERNAME "/feeds/waterball.freeheap");
-
-
-#include <IFTTTWebhook.h>
-IFTTTWebhook ifttt(IFTTT_API_KEY, IFTTT_EVENT_NAME);
-
-void mqtt_connect(void) {
-  int8_t ret;
-
- Serial.print("Connecting to Adafruit IO... ");
-
-  while ((ret = mqtt.connect()) != 0) {
-    switch (ret) {
-      case 1: Serial.println("Wrong protocol"); break;
-      case 2: Serial.println("ID rejected"); break;
-      case 3: Serial.println("Server unavail"); break;
-      case 4: Serial.println("Bad user/pass"); break;
-      case 5: Serial.println("Not authed"); break;
-      case 6: Serial.println("Failed to subscribe"); break;
-      default: Serial.println("Connection failed"); break;
-    }
-
-    if(ret >= 0)
-      mqtt.disconnect();
-
-    Serial.println("Retrying connection...");
-    delay(5000);
-  }
-
-  Serial.println("Adafruit IO Connected!");
-}
-
-#include <rom/rtc.h>
-
-const char* reboot_reason(int code) {
-  switch(code) {
-    case 1 : return "POWERON_RESET";          /**<1, Vbat power on reset*/
-    case 3 : return "SW_RESET";               /**<3, Software reset digital core*/
-    case 4 : return "OWDT_RESET";             /**<4, Legacy watch dog reset digital core*/
-    case 5 : return "DEEPSLEEP_RESET";        /**<5, Deep Sleep reset digital core*/
-    case 6 : return "SDIO_RESET";             /**<6, Reset by SLC module, reset digital core*/
-    case 7 : return "TG0WDT_SYS_RESET";       /**<7, Timer Group0 Watch dog reset digital core*/
-    case 8 : return "TG1WDT_SYS_RESET";       /**<8, Timer Group1 Watch dog reset digital core*/
-    case 9 : return "RTCWDT_SYS_RESET";       /**<9, RTC Watch dog Reset digital core*/
-    case 10 : return "INTRUSION_RESET";       /**<10, Instrusion tested to reset CPU*/
-    case 11 : return "TGWDT_CPU_RESET";       /**<11, Time Group reset CPU*/
-    case 12 : return "SW_CPU_RESET";          /**<12, Software reset CPU*/
-    case 13 : return "RTCWDT_CPU_RESET";      /**<13, RTC Watch dog Reset CPU*/
-    case 14 : return "EXT_CPU_RESET";         /**<14, for APP CPU, reseted by PRO CPU*/
-    case 15 : return "RTCWDT_BROWN_OUT_RESET";/**<15, Reset when the vdd voltage is not stable*/
-    case 16 : return "RTCWDT_RTC_RESET";      /**<16, RTC Watch dog reset digital core and rtc module*/
-    default : return "NO_MEAN";
-  }
-}
   
 void setup() {
   byte mac_address[6];
@@ -140,16 +74,6 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println("Hello World!");
-
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.setTextSize(2);
-  display.println("Hello, world!");
-  display.display();
-  Serial.println("[display]");
 
   wifiMulti.addAP(WIFI_SSID1, WIFI_PASSWORD1);
   wifiMulti.addAP(WIFI_SSID2, WIFI_PASSWORD2);
@@ -165,15 +89,6 @@ void setup() {
     delay(100);
   }
   Serial.println("[wifi]");
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.setTextSize(2);
-  display.print(WiFi.localIP());
-  display.display();
-
-  ifttt.trigger("reboot", reboot_reason(rtc_get_reset_reason(0)),  reboot_reason(rtc_get_reset_reason(1)));
-  Serial.println("[IFTTT]");
 
   if(!MDNS.begin(hostname))
     Serial.println("Error setting up MDNS responder!");
@@ -196,9 +111,6 @@ void setup() {
     Serial.println("subscribe to # failed");
   }
   Serial.println("[MQTT]");
-
-  mqtt_connect();
-  Serial.println("[AIO]");
 
   configTime(TZ_OFFSET, DST_OFFSET, "pool.ntp.org", "time.nist.gov");
   Serial.println("[NTP]");
@@ -238,17 +150,25 @@ void setup() {
   bme280.begin();
   Serial.println("[bme280]");
 
+#ifdef USE_SONAR
   sonar.begin();
   Serial.println("[sonar]");
+#endif
+
+#ifdef USE_TOFL
+  tofl_sensor.begin();
+  Serial.println("[tofl]");
+#endif
 
   sensors.begin();
   Serial.println("[dallas]");
 
+#ifdef USE_PH
   ph_sensor.begin();
   Serial.println("[ph]");
+#endif
 
   update_mqtt.attach(MQTT_UPDATE_FREQUENCY, []() { update_mqtt_flag = true; });
-  update_adafruit.attach(ADAFRUIT_UPDATE_FREQUENCY, []() { update_adafruit_flag = true; });
   update_heartbeat.attach(HEARTBEAT_UPDATE_FREQUENCY, []() { update_heartbeat_flag = true; });
   update_rest.attach(REST_UPDATE_FREQUENCY, []() { update_rest_flag = true; });
 
@@ -281,11 +201,6 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void loop() {
-  if(! mqtt.ping(3)) {
-    if(! mqtt.connected())
-      mqtt_connect();
-  }
-
   if(!mqtt_client.connected()) {
     mqtt_client.connect(MQTT_SERVER, MQTT_USERNAME, MQTT_PASSWORD);
     mqtt_client.subscribe("/hydro/rgb");
@@ -298,68 +213,40 @@ void loop() {
 
   if(update_mqtt_flag || update_rest_flag || update_adafruit_flag) {
     bme280.handle();
-    sonar.handle();
-    ph_sensor.handle();
 
+#ifdef USE_SONAR
+    sonar.handle();
     unsigned distance = 0;
+
+    distance = sonar.distance_cm();
+    Serial.printf("SONAR distance %u\n", distance);
+#endif
+
+#ifdef USE_PH
+    ph_sensor.handle();
+    float ph = 0;
+
+    ph = ph_sensor.ph();
+
+    Serial.print("pH ");
+    Serial.println(ph);
+#endif
+
     int temperature = 0, humidity = 0, pressure = 0;
     int16_t water_temp = 0;
-    float ph = 0;
 
     sensors.requestTemperatures();
     water_temp = sensors.getTempC(sensor1);
     Serial.printf("Dallas %d\n", water_temp);
     Serial.println(sensors.getTempC(sensor1));
 
-    distance = sonar.distance_cm();
-    Serial.printf("SONAR distance %u\n", distance);
-
     temperature = bme280.temperature();
     humidity = bme280.humidity();
     pressure = bme280.pressure();
 
-    temperature_feed.publish(temperature);
-
     Serial.printf("Temperature %d\n", temperature);
     Serial.printf("Pressure %d\n", pressure);
     Serial.printf("Humidity %d\n", humidity);
-
-
-    ph = ph_sensor.ph();
-
-    Serial.print("pH ");
-    Serial.println(ph);
-
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.setTextSize(2);
-    display.printf("%dcm\n", distance);
-    display.printf("%dF %d%%\n", (int)(temperature*9.0/5 + 32), humidity);
-    display.display();
-
-    if(update_adafruit_flag) {
-      update_adafruit_flag = false;
-
-      if(sonar.valid())
-	distance_feed.publish(distance);
-
-      pressure_feed.publish(pressure);
-      humidity_feed.publish(humidity);
-
-#define RGB_VALID lux != -1 && lux != 65535 && (time(NULL) - last_rgb_update_time < 5 * 60)
-      if(RGB_VALID) {
-	lux_feed.publish(lux);
-	red_feed.publish(red);
-	green_feed.publish(green);
-	blue_feed.publish(blue);
-      }
-
-      uptime_feed.publish((unsigned)uptime.uptime()/1000);
-      Serial.printf("Uptime %.2f seconds\n", uptime.uptime() / 1000.0);
-
-      freeheap_feed.publish(ESP.getFreeHeap());
-      Serial.printf("Free heap %u bytes\n", ESP.getFreeHeap());
-    }
 
     char buffer[500];
     if(update_rest_flag || update_mqtt_flag) {
@@ -385,19 +272,21 @@ void loop() {
 
 
 
+#ifdef USE_SONAR
       if(sonar.valid())
 	snprintf(sm_buffer, 100, "\"distance\": %d, ", distance);
       else
 	snprintf(sm_buffer, 100, "\"distance\": null, ");
       strncat(buffer, sm_buffer, 500);
+#endif
 
-
-
+#ifdef USE_PH
       if(ph_sensor.valid())
 	snprintf(sm_buffer, 100, "\"ph\": %f ", ph);
       else
 	snprintf(sm_buffer, 100, "\"ph\": null ");
       strncat(buffer, sm_buffer, 500);
+#endif
 
       strncat(buffer, "}", 500);
     }

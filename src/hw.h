@@ -1,6 +1,7 @@
-#define ONE_WIRE_BUS_PIN 0
+#pragma once
 
-#define SONAR_TRIGGER_PIN 17
-#define SONAR_ECHO_PIN 16
+#define ONE_WIRE_BUS_PIN 14
 
-#define PH_ADC_INPUT 0
+#define LED_DATA__PIN 17
+
+#define WATERBALL_BME280_ADDRESS 0x76

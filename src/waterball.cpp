@@ -83,7 +83,7 @@ static boolean waterball_system_update(char* buf, size_t buf_len) {
 
   snprintf(buf,
 	   buf_len,
-	   "{ \"id\": \"%s\", \"org.homebus.experimental.furball-system\": { \"name\": \"%s\", \"build\": \"%s\", \"ip\": \"%d.%d.%d.%d\", \"mac_addr\": \"%s\" } }",
+	   "{ \"id\": \"%s\", \"org.homebus.experimental.waterball-system\": { \"name\": \"%s\", \"build\": \"%s\", \"ip\": \"%d.%d.%d.%d\", \"mac_addr\": \"%s\" } }",
 	   homebus_uuid(),
 	   App.hostname().c_str(), App.build_info().c_str(), ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3], mac_address.c_str()
 	   );
@@ -125,5 +125,17 @@ void waterball_loop() {
   next_update = millis() + UPDATE_DELAY;
 
   if(waterball_air_update(buf, MAX_BUF_LEN))
-     homebus_publish(buf);
+    homebus_publish_to("org.homebus.experimental.air-sensor", buf);
+
+  if(waterball_distance_update(buf, MAX_BUF_LEN))
+    homebus_publish_to("org.homebus.experimental.distance-sensor", buf);
+
+  if(waterball_water_update(buf, MAX_BUF_LEN))
+    homebus_publish_to("org.homebus.experimental.water-sensor", buf);
+
+  if(waterball_system_update(buf, MAX_BUF_LEN))
+    homebus_publish_to("org.homebus.experimental.waterball-system", buf);
+
+  if(waterball_diagnostic_update(buf, MAX_BUF_LEN))
+    homebus_publish_to("org.homebus.experimental.waterball-diagnostic", buf);
 }

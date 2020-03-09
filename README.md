@@ -1,6 +1,6 @@
 # The Waterball
 
-
+[![Build Status](https://travis-ci.com/romkey/waterball.svg?branch=master)](https://travis-ci.com/romkey/waterball)
 
 Waterball is an open-source hardware and software project for monitoring hydroponics. 
 

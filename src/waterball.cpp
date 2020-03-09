@@ -69,9 +69,6 @@ static boolean waterball_water_update(char* buf, size_t buf_len) {
     return true;
 }
 
-static boolean waterball_light_update(char* buf, size_t buf_len) {
-}
-
 static boolean waterball_system_update(char* buf, size_t buf_len) {
     static boolean posted = false;
     static IPAddress old_ip = IPAddress(0, 0, 0, 0);
@@ -114,7 +111,6 @@ static boolean waterball_diagnostic_update(char* buf, size_t buf_len) {
 #define MAX_BUF_LEN 512
 
 void waterball_loop() {
-  bool should_publish = false;
   char buf[MAX_BUF_LEN];
 
   static unsigned long next_update = 0;
